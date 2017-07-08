@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<!-- saved from url=(0042)http://www.cnblogs.com/zhwl/p/4664604.html -->
+<html lang="zh-cn"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JavaScript垃圾回收机制 - 郑文亮 - 博客园</title>
+<link type="text/css" rel="stylesheet" href="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/blog-common.css">
+<link id="MainCss" type="text/css" rel="stylesheet" href="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/bundle-SimpleBlue.css">
+<link id="mobile-style" media="only screen and (max-width: 768px)" type="text/css" rel="stylesheet" href="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/bundle-SimpleBlue-mobile.css">
+<link title="RSS" type="application/rss+xml" rel="alternate" href="http://www.cnblogs.com/zhwl/rss">
+<link title="RSD" type="application/rsd+xml" rel="EditURI" href="http://www.cnblogs.com/zhwl/rsd.xml">
+<link type="application/wlwmanifest+xml" rel="wlwmanifest" href="http://www.cnblogs.com/zhwl/wlwmanifest.xml">
+<script async="" src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/analytics.js.下载"></script><script type="text/javascript" src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/encoder.js.下载"></script><script src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/jquery.js.下载" type="text/javascript"></script>  
+<script type="text/javascript">var currentBlogApp = 'zhwl', cb_enable_mathjax=false;var isLogined=false;</script>
+<script src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/blog-common.js.下载" type="text/javascript"></script>
+</head>
+<body>
+<a name="top"></a>
+
+<div id="home">
+<div id="header">
+	<div id="blogTitle">
+		
+<!--done-->
+<div class="title"><a id="Header1_HeaderTitle" class="headermaintitle" href="http://www.cnblogs.com/zhwl/">郑文亮</a></div>
+<div class="subtitle">专心地钻研编程，每天进步一点点</div>
+
+
+
+		
+	</div><!--end: blogTitle 博客的标题和副标题 -->
+	<div id="navigator">
+		
+<ul id="navList">
+<li id="nav_sitehome"><a id="blog_nav_sitehome" class="menu" href="http://www.cnblogs.com/">博客园</a></li>
+<li id="nav_myhome"><a id="blog_nav_myhome" class="menu" href="http://www.cnblogs.com/zhwl/">首页</a></li>
+<li id="nav_newpost"><a id="blog_nav_newpost" class="menu" rel="nofollow" href="https://i.cnblogs.com/EditPosts.aspx?opt=1">新随笔</a></li>
+<li id="nav_contact"><a id="blog_nav_contact" class="menu" rel="nofollow" href="https://msg.cnblogs.com/send/%E9%83%91%E6%96%87%E4%BA%AE">联系</a></li>
+<li id="nav_rss">
+<!----></li>
+<li id="nav_admin"><a id="blog_nav_admin" class="menu" rel="nofollow" href="https://i.cnblogs.com/">管理</a></li>
+</ul>
+
+		<div class="blogStats">
+			
+			<div id="blog_stats">
+<!--done-->
+随笔-1609&nbsp;
+文章-3&nbsp;
+评论-550&nbsp;
+</div>
+			
+		</div><!--end: blogStats -->
+	</div><!--end: navigator 博客导航栏 -->
+</div><!--end: header 头部 -->
+<div id="main">
+	<div id="mainContent">
+	<div class="forFlow">
+		
+<div id="post_detail">
+<!--done-->
+<div id="topics">
+	<div class="post">
+		<h1 class="postTitle">
+			<a id="cb_post_title_url" class="postTitle2" href="http://www.cnblogs.com/zhwl/p/4664604.html">JavaScript垃圾回收机制</a>
+		</h1>
+		<div class="clear"></div>
+		<div class="postBody">
+			<div id="cnblogs_post_body"><p><strong>一、垃圾回收的必要性</strong></p>
+<p>　　下面这段话引自《JavaScript权威指南（第四版）》</p>
+<p><em>　　由于字符串、对象和数组没有固定大小，所有当他们的大小已知时，才能对他们进行动态的存储分配。JavaScript程序每次创建字符串、数组或对象时，解释器都必须分配内存来存储那个实体。只要像这样动态地分配了内存，最终都要释放这些内存以便他们能够被再用，否则，JavaScript的解释器将会消耗完系统中所有可用的内存，造成系统崩溃。</em></p>
+<p>　　这段话解释了为什么需要系统需要垃圾回收，JS不像C/C++，他有自己的一套垃圾回收机制（Garbage Collection）。JavaScript的解释器可以检测到何时程序不再使用一个对象了，当他确定了一个对象是无用的时候，他就知道不再需要这个对象，可以把它所占用的内存释放掉了。例如：</p>
+<div class="cnblogs_code">
+<pre>var a = "before";
+var b = "override a";
+var a = b; //重写a</pre>
+</div>
+<p>　　这段代码运行之后，“before”这个字符串失去了引用（之前是被a引用），系统检测到这个事实之后，就会释放该字符串的存储空间以便这些空间可以被再利用。</p>
+<p>&nbsp;</p>
+<p><strong>二、垃圾回收原理浅析</strong></p>
+<p>　　现在各大浏览器通常用采用的垃圾回收有两种方法：标记清除、引用计数。</p>
+<p><strong>1、标记清除</strong></p>
+<p>　　这是javascript中最常用的垃圾回收方式。当变量进入执行环境是，就标记这个变量为“进入环境”。从逻辑上讲，永远不能释放进入环境的变量所占用的内存，因为只要执行流进入相应的环境，就可能会用到他们。当变量离开环境时，则将其标记为“离开环境”。<br>　　垃圾收集器在运行的时候会给存储在内存中的所有变量都加上标记。然后，它会去掉环境中的变量以及被环境中的变量引用的标记。而在此之后再被加上标记的变量将被视为准备删除的变量，原因是环境中的变量已经无法访问到这些变量了。最后。垃圾收集器完成内存清除工作，销毁那些带标记的值，并回收他们所占用的内存空间。</p>
+<p><em>关于这一块，建议读读<a title="作用域链" href="http://www.cnblogs.com/TomXu/archive/2012/01/18/2312463.html" target="_blank">Tom大叔的几篇文章</a>，关于作用域链的一些知识详解，读完差不多就知道了，哪些变量会被做标记。</em><br><br><strong>2、引用计数</strong></p>
+<p>　　另一种不太常见的垃圾回收策略是引用计数。引用计数的含义是跟踪记录每个值被引用的次数。当声明了一个变量并将一个引用类型赋值给该变量时，则这个值的引用次数就是1。相反，如果包含对这个值引用的变量又取得了另外一个值，则这个值的引用次数就减1。当这个引用次数变成0时，则说明没有办法再访问这个值了，因而就可以将其所占的内存空间给收回来。这样，垃圾收集器下次再运行时，它就会释放那些引用次数为0的值所占的内存。<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>但是用这种方法存在着一个问题，下面来看看代码：</p>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>function problem() {
+    var objA = new Object();
+    var objB = new Object();
+
+    objA.someOtherObject = objB;
+    objB.anotherObject = objA;
+}</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+<p>　　在这个例子中，objA和objB通过各自的属性相互引用；也就是说这两个对象的引用次数都是2。在采用引用计数的策略中，由于函数执行之后，这两个对象都离开了作用域，函数执行完成之后，objA和objB还将会继续存在，因为他们的引用次数永远不会是0。这样的相互引用如果说很大量的存在就会导致大量的内存泄露。<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>　　我们知道，IE中有一部分对象并不是原生JavaScript对象。例如，其BOM和DOM中的对象就是使用C++以COM（Component Object&nbsp;<br>Model，组件对象）对象的形式实现的，而COM对象的垃圾回收器就是采用的引用计数的策略。因此，即使IE的Javascript引擎使用标记清除的策略来实现的，但JavaScript访问的COM对象依然是基于引用计数的策略的。说白了，只要IE中涉及COM对象，就会存在循环引用的问题。看看下面的这个简单的例子：</p>
+<div class="cnblogs_code">
+<pre>var element = document.getElementById("some_element");
+var myObj =new Object();
+myObj.element = element;
+element.someObject = myObj;</pre>
+</div>
+<p>　　上面这个例子中，在一个DOM元素(element)与一个原生JavaScript对象(myObj)之间建立了循环引用。其中，变量myObj有一个名为element的属性指向element；而变量element有一个名为someObject的属性回指到myObj。由于循环引用，即使将例子中的DOM从页面中移除，内存也永远不会回收。<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>　　不过上面的问题也不是不能解决，我们可以手动切断他们的循环引用。</p>
+<div class="cnblogs_code">
+<pre>myObj.element = null;
+element.someObject =null;</pre>
+</div>
+<p>　　这样写代码的话就可以解决循环引用的问题了，也就防止了内存泄露的问题。</p>
+<p>&nbsp;</p>
+<p><strong>三、减少JavaScript中的垃圾回收</strong></p>
+<p>　　首先，最明显的，new关键字就意味着一次内存分配，例如 new Foo()。最好的处理方法是：在初始化的时候新建对象，然后在后续过程中尽量多的重用这些创建好的对象。</p>
+<p>另外还有以下三种内存分配表达式（可能不像new关键字那么明显了）：</p>
+<ul>
+<li>{} （创建一个新对象）</li>
+<li>[] （创建一个新数组）</li>
+<li>function() {…} (创建一个新的方法，注意：新建方法也会导致垃圾收集！！)</li>
+</ul>
+<p><strong>1、对象object优化</strong></p>
+<p>　　为了最大限度的实现对象的重用，应该像避使用new语句一样避免使用{}来新建对象。</p>
+<p>　　{“foo”:”bar”}这种方式新建的带属性的对象，常常作为方法的返回值来使用，可是这将会导致过多的内存创建，因此最好的解决办法是：每一次函数调用完成之后，将需要返回的数据放入一个全局的对象中，并返回此全局对象。如果使用这种方式，就意味着每一次方法调用都会导致全局对象内容的修改，这有可能会导致错误的发生。因此，一定要对此全局对象的使用进行详细的注释和说明。</p>
+<p>　　有一种方式能够保证对象（确保对象prototype上没有属性）的重复利用，那就是遍历此对象的所有属性，并逐个删除，最终将对象清理为一个空对象。</p>
+<p>　　cr.wipe(obj)方法就是为此功能而生，代码如下：<em>&nbsp;</em></p>
+<div>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>// 删除obj对象的所有属性，高效的将obj转化为一个崭新的对象！
+cr.wipe = function (obj) {
+    for (var p in obj) {
+         if (obj.hasOwnProperty(p))
+            delete obj[p];
+    }
+};        </pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+</div>
+<p>　　有些时候，你可以使用cr.wipe(obj)方法清理对象，再为obj添加新的属性，就可以达到重复利用对象的目的。虽然通过清空一个对象来获取“新对象”的做法，比简单的通过{}来创建对象要耗时一些，但是在实时性要求很高的代码中，这一点短暂的时间消耗，将会有效的减少垃圾堆积，并且最终避免垃圾回收暂停，这是非常值得的！</p>
+<p><strong>2、数组array优化</strong></p>
+<p>　　将[]赋值给一个数组对象，是清空数组的捷径（例如： arr = [];），但是需要注意的是，这种方式又创建了一个新的空对象，并且将原来的数组对象变成了一小片内存垃圾！实际上，将数组长度赋值为0（arr.length = 0）也能达到清空数组的目的，并且同时能实现数组重用，减少内存垃圾的产生。</p>
+<p>&nbsp;</p>
+<p><strong>3、方法function优化</strong></p>
+<p>　　方法一般都是在初始化的时候创建，并且此后很少在运行时进行动态内存分配，这就使得导致内存垃圾产生的方法，找起来就不是那么容易了。但是从另一角度来说，这更便于我们寻找了，因为只要是动态创建方法的地方，就有可能产生内存垃圾。例如：将方法作为返回值，就是一个动态创建方法的实例。</p>
+<p>　　在游戏的主循环中，setTimeout或requestAnimationFrame来调用一个成员方法是很常见的，例如：</p>
+<div>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>setTimeout(
+    (function(self) {                    
+      return function () {
+              self.tick();
+    };
+})(this), 16)</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+</div>
+<p>　　每过16毫秒调用一次this.tick()，嗯，乍一看似乎没什么问题，但是仔细一琢磨，每一次调用都返回了一个新的方法对象，这就导致了大量的方法对象垃圾！</p>
+<p>　　为了解决这个问题，可以将作为返回值的方法保存起来，例如：</p>
+<div>
+<div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div>
+<pre>// at startup
+this.tickFunc = (
+    function(self) {
+      return function() {
+                self.tick();
+      };
+    }
+)(this);
+
+// in the tick() function
+setTimeout(this.tickFunc, 16);</pre>
+<div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/copycode.gif" alt="复制代码"></a></span></div></div>
+</div>
+<p>　　相比于每次都新建一个方法对象，这种方式在每一帧当中重用了相同的方法对象。这种方式的优势是显而易见的，而这种思想也可以应用在任何以方法为返回值或者在运行时创建方法的情况当中。</p>
+<p>&nbsp;</p>
+<p><strong>4、高级技术</strong></p>
+<p>　　从根本上来说，javascript本身就是围绕着垃圾收集来设计的。随着我们工作的进行，避免内存垃圾变得越来越困难。因为很多方便实用的Javascript库方法也会产生一些新的对象。对于这些库方法产生的垃圾，我们束手无策，只能重新翻看文档，并且检查方法的返回值。例如，数组的slice方法返回一个新的数组（在不修改原数组的基础上，截取出一部分作为新数组），字符串的substr方法返回一个新的字符串（在不修改原字符串的基础上，截取出一部分字符串作为返回值）等等。</p>
+<p>　　调用这些库方法，将会创建内存垃圾，而你能做的，只有避免调用这些方法，或者用不创建系统垃圾的方式重写这些方法（有点极端啦~）。</p>
+<p>　　例如，在Construct 2引擎中，从数组中利用下标来删除一个元素，是经常进行的操作。最初我们是用下面这种方式来实现的：</p>
+<div>
+<div class="cnblogs_code">
+<pre>var sliced = arr.slice(index + 1);
+arr.length = index;
+arr.push.apply(arr, sliced);</pre>
+</div>
+</div>
+<p>　　然而，slice方法会返回一个新的数组对象（数组中的元素是原数组中删掉的部分），并且会通过arr.push.apply方法将元素重新复制回原数组，但是在此操作之后，该数组就成为了一片内存垃圾。由于这是我们引擎中的垃圾产生的热点代码（使用频率非常很高），因此我们利用了迭代的方式重写了上述代码：</p>
+<div>
+<div class="cnblogs_code">
+<pre>for (var i = index, len = arr.length – 1; i &lt; len; i++)
+    arr[i] = arr[i + 1];
+arr.length = len;</pre>
+</div>
+</div>
+<p>　　显然，重写大量的库函数是非常痛苦的，因此你必须仔细权衡方法的易用性和内存垃圾产生情况。如果产生大量内存垃圾的方法在动画的每一帧中被多次调用，你可能就会兴高采烈的重写库函数啦。</p>
+<p>　　在递归函数中，通过{}构造空对象，并在递归过程中传递数据，虽然是很方便的。但是更好的方式是：利用一个单独的数组对象作为堆栈，在递归过程中对数组进行push和pop操作。更进一步，不要调用array的pop方法（pop将会使得array的最后一个元素将会变成内存垃圾），而应该使用一个索引来记录数组的最后一个元素的位置，在pop时简单的将索引减一即可；类似的，将索引加1来代替array的push操作，只有当索引对应的元素不存在时，才执行真正的push为数组加入一个新元素。</p>
+<p>　　另外，在任何时候，都应该避免使用向量对象（例如：包含x和y属性的vector2对象）。有些方法将向量对象作为方法返回值，既可以支持返回值的再次修改，又能够将需要的属性一次性返回，使用起来非常方便。但是有时候在一帧动画中，创建了成百上千个这样的向量对象，从而导致严重的垃圾回收性能问题，也是非常常见的。因此最好将这些方法分离成具有独立职责的功能个体，例如：利用getX()和getY()方法（返回具体数据）代替getPosition()方法（返回一个vector2对象）。</p>
+<p>&nbsp;</p>
+<p><strong>四、总结</strong></p>
+<p>　　在Javascript中，彻底避免垃圾回收是非常困难的。垃圾回收机制与实时软件（例如：游戏）的实时性要求，从根本上就是对立的。</p>
+<p>　　但是，为了减少内存垃圾，我们还是可以对javascript代码进行彻底检查，有些代码中存在明显的产生过多内存垃圾的问题代码，这些正是我们需要检查并且完善的。</p>
+<p>　　我认为，只要我们投入更多的精力和关注，实现实时的、低垃圾收集的javascript应用还是很有可能的。毕竟，对于可交互性要求较高的游戏或应用来说，实时性和低垃圾收集，两者都是至关重要。</p>
+<p>&nbsp;</p></div><div id="MySignature"></div>
+<div class="clear"></div>
+<div id="blog_post_info_block">
+<div id="BlogPostCategory">分类: <a href="http://www.cnblogs.com/zhwl/category/284137.html" target="_blank">前台javascript</a></div>
+<div id="EntryTag"></div>
+<div id="blog_post_info"><div id="green_channel">
+        <a href="javascript:void(0);" id="green_channel_digg" onclick="DiggIt(4664604,cb_blogId,1);green_channel_success(this,&#39;谢谢推荐！&#39;);">好文要顶</a>
+            <a id="green_channel_follow" onclick="follow(&#39;ee933689-693b-e011-ac81-842b2b196315&#39;);" href="javascript:void(0);">关注我</a>
+    <a id="green_channel_favorite" onclick="AddToWz(cb_entryId);return false;" href="javascript:void(0);">收藏该文</a>
+    <a id="green_channel_weibo" href="javascript:void(0);" title="分享至新浪微博" onclick="ShareToTsina()"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/icon_weibo_24.png" alt=""></a>
+    <a id="green_channel_wechat" href="javascript:void(0);" title="分享至微信" onclick="shareOnWechat()"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/wechat.png" alt=""></a>
+</div>
+<div id="author_profile">
+    <div id="author_profile_info" class="author_profile_info">
+            <a href="http://home.cnblogs.com/u/zhwl/" target="_blank"><img src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/u274740.jpg" class="author_avatar" alt=""></a>
+        <div id="author_profile_detail" class="author_profile_info">
+            <a href="http://home.cnblogs.com/u/zhwl/">郑文亮</a><br>
+            <a href="http://home.cnblogs.com/u/zhwl/followees">关注 - 12</a><br>
+            <a href="http://home.cnblogs.com/u/zhwl/followers">粉丝 - 855</a>
+        </div>
+    </div>
+    <div class="clear"></div>
+    <div id="author_profile_honor"></div>
+    <div id="author_profile_follow">
+                <a href="javascript:void(0);" onclick="follow(&#39;ee933689-693b-e011-ac81-842b2b196315&#39;);return false;">+加关注</a>
+    </div>
+</div>
+<div id="div_digg">
+    <div class="diggit" onclick="votePost(4664604,&#39;Digg&#39;)">
+        <span class="diggnum" id="digg_count">0</span>
+    </div>
+    <div class="buryit" onclick="votePost(4664604,&#39;Bury&#39;)">
+        <span class="burynum" id="bury_count">0</span>
+    </div>
+    <div class="clear"></div>
+    <div class="diggword" id="digg_tips">
+    </div>
+</div>
+</div>
+<div class="clear"></div>
+<div id="post_next_prev"><a href="http://www.cnblogs.com/zhwl/p/4654638.html" class="p_n_p_prefix">« </a> 上一篇：<a href="http://www.cnblogs.com/zhwl/p/4654638.html" title="发布于2015-07-17 15:19">clientHeight ,offsetHeight,style.height,scrollHeight有区别与联系</a><br><a href="http://www.cnblogs.com/zhwl/p/4666540.html" class="p_n_p_prefix">» </a> 下一篇：<a href="http://www.cnblogs.com/zhwl/p/4666540.html" title="发布于2015-07-22 10:11">避免浏览器内存泄露</a><br></div>
+</div>
+
+
+		</div>
+		<div class="postDesc">posted @ <span id="post-date">2015-07-21 15:23</span> <a href="http://www.cnblogs.com/zhwl/">郑文亮</a> 阅读(<span id="post_view_count">2247</span>) 评论(<span id="post_comment_count">0</span>)  <a href="https://i.cnblogs.com/EditPosts.aspx?postid=4664604" rel="nofollow">编辑</a> <a href="http://www.cnblogs.com/zhwl/p/4664604.html#" onclick="AddToWz(4664604);return false;">收藏</a></div>
+	</div>
+	<script type="text/javascript">var allowComments=true,cb_blogId=83874,cb_entryId=4664604,cb_blogApp=currentBlogApp,cb_blogUserGuid='ee933689-693b-e011-ac81-842b2b196315',cb_entryCreatedDate='2015/7/21 15:23:00';loadViewCount(cb_entryId);</script>
+	
+</div><!--end: topics 文章、评论容器-->
+</div><a name="!comments"></a><div id="blog-comments-placeholder"></div><script type="text/javascript">var commentManager = new blogCommentManager();commentManager.renderComments(0);</script>
+<div id="comment_form" class="commentform">
+<a name="commentform"></a>
+<div id="divCommentShow"></div>
+<div id="comment_nav"><span id="span_refresh_tips"></span><a href="javascript:void(0);" onclick="return RefreshCommentList();" id="lnk_RefreshComments" runat="server" clientidmode="Static">刷新评论</a><a href="http://www.cnblogs.com/zhwl/p/4664604.html#" onclick="return RefreshPage();">刷新页面</a><a href="http://www.cnblogs.com/zhwl/p/4664604.html#top">返回顶部</a></div>
+<div id="comment_form_container"><div class="login_tips">注册用户登录后才能发表评论，请 <a rel="nofollow" href="javascript:void(0);" class="underline" onclick="return login(&#39;commentform&#39;);">登录</a> 或 <a rel="nofollow" href="javascript:void(0);" class="underline" onclick="return register();">注册</a>，<a href="http://www.cnblogs.com/">访问</a>网站首页。</div></div>
+<div class="ad_text_commentbox" id="ad_text_under_commentbox"></div>
+<div id="ad_t2"><a href="http://www.ucancode.com/index.htm" target="_blank">【推荐】50万行VC++源码: 大型组态工控、电力仿真CAD与GIS源码库</a><br><a href="http://click.aliyun.com/m/21970/" target="_blank">【阿里云】云计算科技红利邀您免费体验！云服务器、云数据库等35+产品，6个月免费使用！</a><br><a href="https://cloud.tencent.com/developer/labs?fromSource=gwzcw.241259.241259.241259" target="_blank">【免费】从零开始学编程，开发者专属实验平台免费实践！</a><br><a href="https://www.upyun.com/618?utm_source=cnblogs&amp;utm_medium=referral&amp;utm_content=618" target="_blank">【推荐】又拍云年中大促！现在注册，充值最高送4800元</a><br></div>
+<div id="opt_under_post"></div>
+<div id="cnblogs_c1" class="c_ad_block"><a href="https://cn.udacity.com/dand/?utm_source=cnblog&amp;utm_medium=referral&amp;utm_campaign=dand04" target="_blank"><img width="300" height="250" src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/24442-20170622211528820-758499309.jpg" alt="优达学城_FaceBook_0623"></a></div>
+<div id="under_post_news"><div class="itnews c_ad_block"><b>最新IT新闻</b>:<br> ·  <a href="http://news.cnblogs.com/n/572355/" target="_blank">无人驾驶抢人继续：谷歌挖来特斯拉的技术大牛负责硬件</a><br> ·  <a href="http://news.cnblogs.com/n/572354/" target="_blank">京东智慧物流三大支柱：AI+物流到底发展得怎么样了？</a><br> ·  <a href="http://news.cnblogs.com/n/572353/" target="_blank">联想教父手书千字点赞马云美国演讲：给中国长脸了</a><br> ·  <a href="http://news.cnblogs.com/n/572352/" target="_blank">小米手机全新官方主题上线：图标风格大变</a><br> ·  <a href="http://news.cnblogs.com/n/572351/" target="_blank">Google开始从搜索结果中删除个人医疗记录</a><br>» <a href="http://news.cnblogs.com/" title="IT新闻" target="_blank">更多新闻...</a></div></div>
+<div id="cnblogs_c2" class="c_ad_block"><a href="https://www.mtyun.com/activity-anniversary?site=cnblogs&amp;campaign=20170601sales" target="_blank"><img width="468" height="60" src="./JavaScript垃圾回收机制 - 郑文亮 - 博客园_files/24442-20170615095125603-13625507.png" alt="美团云"></a></div>
+<div id="under_post_kb"><div class="itnews c_ad_block" id="kb_block"><b>最新知识库文章</b>:<br><div id="kb_recent"> ·  <a href="http://kb.cnblogs.com/page/570194/" target="_blank">小printf的故事：什么是真正的程序员？</a><br> ·  <a href="http://kb.cnblogs.com/page/569992/" target="_blank">程序员的工作、学习与绩效</a><br> ·  <a href="http://kb.cnblogs.com/page/569056/" target="_blank">软件开发为什么很难</a><br> ·  <a href="http://kb.cnblogs.com/page/565901/" target="_blank">唱吧DevOps的落地，微服务CI/CD的范本技术解读</a><br> ·  <a href="http://kb.cnblogs.com/page/566523/" target="_blank">程序员，如何从平庸走向理想？</a><br></div>» <a href="http://kb.cnblogs.com/" target="_blank">更多知识库文章...</a></div></div>
+<div id="HistoryToday" class="c_ad_block"><b>历史上的今天:</b><br>2014-07-21 <a href="http://www.cnblogs.com/zhwl/p/3858781.html">extjs用iframe的问题</a><br>2014-07-21 <a href="http://www.cnblogs.com/zhwl/p/3858686.html">让Firefox支持offsetX、offsetY</a><br>2014-07-21 <a href="http://www.cnblogs.com/zhwl/p/3858682.html">js获取Html元素的实际宽度高度</a><br></div>
+<script type="text/javascript">
+    fixPostBody();
+    setTimeout(function () { incrementViewCount(cb_entryId); }, 50);
+    deliverAdT2();
+    deliverAdC1();
+    deliverAdC2();    
+    loadNewsAndKb();
+    loadBlogSignature();
+    LoadPostInfoBlock(cb_blogId, cb_entryId, cb_blogApp, cb_blogUserGuid);
+    GetPrevNextPost(cb_entryId, cb_blogId, cb_entryCreatedDate);
+    loadOptUnderPost();
+    GetHistoryToday(cb_blogId, cb_blogApp, cb_entryCreatedDate);   
+</script>
+</div>
+
+
+	</div><!--end: forFlow -->
+	</div><!--end: mainContent 主体内容容器-->
+
+	<div id="sideBar">
+		<div id="sideBarMain">
+			
+<!--done-->
+<div class="newsItem">
+<h3 class="catListTitle">公告</h3>
+	<div id="blog-news"><div id="profile_block">昵称：<a href="http://home.cnblogs.com/u/zhwl/">郑文亮</a><br>园龄：<a href="http://home.cnblogs.com/u/zhwl/" title="入园时间：2011-02-18">6年4个月</a><br>粉丝：<a href="http://home.cnblogs.com/u/zhwl/followers/">855</a><br>关注：<a href="http://home.cnblogs.com/u/zhwl/followees/">12</a><div id="p_b_follow"><a href="javascript:void(0);" onclick="follow(&#39;ee933689-693b-e011-ac81-842b2b196315&#39;)">+加关注</a></div></div></div><script type="text/javascript">loadBlogNews();</script>
+</div>
+
+			<div id="calendar"><div id="blog-calendar" style=""><table id="blogCalendar" class="Cal" cellspacing="0" cellpadding="0" title="Calendar">
+	<tbody><tr><td colspan="7"><table class="CalTitle" cellspacing="0">
+		<tbody><tr><td class="CalNextPrev"><a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2017/05/01&#39;);return false;">&lt;</a></td><td align="center">2017年6月</td><td class="CalNextPrev" align="right"><a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2017/07/01&#39;);return false;">&gt;</a></td></tr>
+	</tbody></table></td></tr><tr><th class="CalDayHeader" align="center" abbr="日" scope="col">日</th><th class="CalDayHeader" align="center" abbr="一" scope="col">一</th><th class="CalDayHeader" align="center" abbr="二" scope="col">二</th><th class="CalDayHeader" align="center" abbr="三" scope="col">三</th><th class="CalDayHeader" align="center" abbr="四" scope="col">四</th><th class="CalDayHeader" align="center" abbr="五" scope="col">五</th><th class="CalDayHeader" align="center" abbr="六" scope="col">六</th></tr><tr><td class="CalOtherMonthDay" align="center">28</td><td class="CalOtherMonthDay" align="center">29</td><td class="CalOtherMonthDay" align="center">30</td><td class="CalOtherMonthDay" align="center">31</td><td align="center">1</td><td align="center">2</td><td class="CalWeekendDay" align="center">3</td></tr><tr><td class="CalWeekendDay" align="center">4</td><td align="center">5</td><td align="center">6</td><td align="center">7</td><td align="center">8</td><td align="center">9</td><td class="CalWeekendDay" align="center">10</td></tr><tr><td class="CalWeekendDay" align="center">11</td><td align="center">12</td><td align="center">13</td><td align="center">14</td><td align="center">15</td><td align="center">16</td><td class="CalWeekendDay" align="center">17</td></tr><tr><td class="CalWeekendDay" align="center">18</td><td align="center">19</td><td align="center">20</td><td align="center">21</td><td align="center">22</td><td class="CalTodayDay" align="center">23</td><td class="CalWeekendDay" align="center">24</td></tr><tr><td class="CalWeekendDay" align="center">25</td><td align="center">26</td><td align="center">27</td><td align="center">28</td><td align="center">29</td><td align="center">30</td><td class="CalOtherMonthDay" align="center">1</td></tr><tr><td class="CalOtherMonthDay" align="center">2</td><td class="CalOtherMonthDay" align="center">3</td><td class="CalOtherMonthDay" align="center">4</td><td class="CalOtherMonthDay" align="center">5</td><td class="CalOtherMonthDay" align="center">6</td><td class="CalOtherMonthDay" align="center">7</td><td class="CalOtherMonthDay" align="center">8</td></tr>
+</tbody></table></div><script type="text/javascript">loadBlogDefaultCalendar();</script></div>
+			
+			<div id="leftcontentcontainer">
+				<div id="blog-sidecolumn"><div id="sidebar_search" class="sidebar-block">
+<div id="sidebar_search" class="mySearch">
+<h3 class="catListTitle">搜索</h3>
+<div id="sidebar_search_box">
+<div id="widget_my_zzk" class="div_my_zzk"><input type="text" id="q" onkeydown="return zzk_go_enter(event);" class="input_my_zzk">&nbsp;<input onclick="zzk_go()" type="button" value="找找看" id="btnZzk" class="btn_my_zzk"></div>
+
+</div>
+</div>
+
+</div><div id="sidebar_toptags" class="sidebar-block"></div><div id="sidebar_categories">
+<div class="catListPostCategory">
+<h3 class="catListTitle">随笔分类<span style="font-size:11px;font-weight:normal">(1704)</span></h3>
+
+<ul>
+
+<li><a id="CatList_LinkList_0_Link_0" href="http://www.cnblogs.com/zhwl/category/284132.html">Asp.Net(133)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_1" href="http://www.cnblogs.com/zhwl/category/284138.html">asp.net MVC(19)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_2" href="http://www.cnblogs.com/zhwl/category/284139.html">c#(54)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_3" href="http://www.cnblogs.com/zhwl/category/284289.html">c# winform(17)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_4" href="http://www.cnblogs.com/zhwl/category/356791.html">flash/flex(14)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_5" href="http://www.cnblogs.com/zhwl/category/566167.html">Hadoop(16)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_6" href="http://www.cnblogs.com/zhwl/category/309004.html">JAVA(106)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_7" href="http://www.cnblogs.com/zhwl/category/289263.html">Json(9)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_8" href="http://www.cnblogs.com/zhwl/category/322154.html">Jsp(9)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_9" href="http://www.cnblogs.com/zhwl/category/455938.html">Linux(centos)(43)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_10" href="http://www.cnblogs.com/zhwl/category/453930.html">Linux(ubuntu)(16)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_11" href="http://www.cnblogs.com/zhwl/category/355050.html">lucene(34)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_12" href="http://www.cnblogs.com/zhwl/category/284300.html">Microsoft Ajax</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_13" href="http://www.cnblogs.com/zhwl/category/519975.html">nginx(3)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_14" href="http://www.cnblogs.com/zhwl/category/681251.html">node.js(1)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_15" href="http://www.cnblogs.com/zhwl/category/312707.html">Others(45)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_16" href="http://www.cnblogs.com/zhwl/category/473302.html">Phonegap/jQueryMobile(20)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_17" href="http://www.cnblogs.com/zhwl/category/548964.html">phonejs(1)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_18" href="http://www.cnblogs.com/zhwl/category/381211.html">PHP(30)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_19" href="http://www.cnblogs.com/zhwl/category/284296.html">PowerBuild(5)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_20" href="http://www.cnblogs.com/zhwl/category/342960.html">Python(16)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_21" href="http://www.cnblogs.com/zhwl/category/719596.html">redis(3)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_22" href="http://www.cnblogs.com/zhwl/category/284293.html">SharePoint</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_23" href="http://www.cnblogs.com/zhwl/category/284298.html">silverlight(1)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_24" href="http://www.cnblogs.com/zhwl/category/554549.html">SmartGwt(16)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_25" href="http://www.cnblogs.com/zhwl/category/284292.html">UML(3)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_26" href="http://www.cnblogs.com/zhwl/category/369804.html">visual c++(73)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_27" href="http://www.cnblogs.com/zhwl/category/284288.html">WCF(7)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_28" href="http://www.cnblogs.com/zhwl/category/630277.html">webApp(1)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_29" href="http://www.cnblogs.com/zhwl/category/284822.html">WebServices(7)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_30" href="http://www.cnblogs.com/zhwl/category/284291.html">WF</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_31" href="http://www.cnblogs.com/zhwl/category/284290.html">WPF</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_32" href="http://www.cnblogs.com/zhwl/category/284315.html">操作系统(44)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_33" href="http://www.cnblogs.com/zhwl/category/358364.html">辅助工具(7)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_34" href="http://www.cnblogs.com/zhwl/category/525692.html">架构设计(6)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_35" href="http://www.cnblogs.com/zhwl/category/295027.html">敏捷开发(2)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_36" href="http://www.cnblogs.com/zhwl/category/401442.html">苹果机器用(2)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_37" href="http://www.cnblogs.com/zhwl/category/591111.html">前台ExtJs(42)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_38" href="http://www.cnblogs.com/zhwl/category/285011.html">前台HTML/CSS(116)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_39" href="http://www.cnblogs.com/zhwl/category/558382.html">前台html5(26)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_40" href="http://www.cnblogs.com/zhwl/category/284137.html">前台javascript(117)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_41" href="http://www.cnblogs.com/zhwl/category/284287.html">前台jQuery(65)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_42" href="http://www.cnblogs.com/zhwl/category/309912.html">手机开发(Android)(180)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_43" href="http://www.cnblogs.com/zhwl/category/363528.html">手机开发(flash)(4)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_44" href="http://www.cnblogs.com/zhwl/category/335486.html">手机开发(iPhone)(196)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_45" href="http://www.cnblogs.com/zhwl/category/567849.html">数据库HBase(10)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_46" href="http://www.cnblogs.com/zhwl/category/512376.html">数据库MongoDb(17)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_47" href="http://www.cnblogs.com/zhwl/category/405955.html">数据库Mysql(14)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_48" href="http://www.cnblogs.com/zhwl/category/559241.html">数据库oracle(33)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_49" href="http://www.cnblogs.com/zhwl/category/284295.html">数据库SqlServer(28)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_50" href="http://www.cnblogs.com/zhwl/category/295177.html">随想(18)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_51" href="http://www.cnblogs.com/zhwl/category/566258.html">淘宝网(18)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_52" href="http://www.cnblogs.com/zhwl/category/561311.html">微信开发(3)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_53" href="http://www.cnblogs.com/zhwl/category/327175.html">物联网(20)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_54" href="http://www.cnblogs.com/zhwl/category/284301.html">项目管理(10)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_55" href="http://www.cnblogs.com/zhwl/category/358330.html">需要补充的(2)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_56" href="http://www.cnblogs.com/zhwl/category/536927.html">移动黄页(12)</a> </li>
+
+<li><a id="CatList_LinkList_0_Link_57" href="http://www.cnblogs.com/zhwl/category/293088.html">质量保证QA(10)</a> </li>
+
+</ul>
+
+</div>
+
+<div class="catListPostArchive">
+<h3 class="catListTitle">随笔档案<span style="font-size:11px;font-weight:normal">(1609)</span></h3>
+
+<ul>
+
+<li><a id="CatList_LinkList_1_Link_0" href="http://www.cnblogs.com/zhwl/archive/2017/03.html">2017年3月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_1" href="http://www.cnblogs.com/zhwl/archive/2016/04.html">2016年4月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_2" href="http://www.cnblogs.com/zhwl/archive/2016/03.html">2016年3月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_3" href="http://www.cnblogs.com/zhwl/archive/2016/02.html">2016年2月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_4" href="http://www.cnblogs.com/zhwl/archive/2016/01.html">2016年1月 (2)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_5" href="http://www.cnblogs.com/zhwl/archive/2015/12.html">2015年12月 (8)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_6" href="http://www.cnblogs.com/zhwl/archive/2015/11.html">2015年11月 (11)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_7" href="http://www.cnblogs.com/zhwl/archive/2015/10.html">2015年10月 (2)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_8" href="http://www.cnblogs.com/zhwl/archive/2015/09.html">2015年9月 (5)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_9" href="http://www.cnblogs.com/zhwl/archive/2015/08.html">2015年8月 (7)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_10" href="http://www.cnblogs.com/zhwl/archive/2015/07.html">2015年7月 (16)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_11" href="http://www.cnblogs.com/zhwl/archive/2015/06.html">2015年6月 (11)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_12" href="http://www.cnblogs.com/zhwl/archive/2015/05.html">2015年5月 (7)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_13" href="http://www.cnblogs.com/zhwl/archive/2015/04.html">2015年4月 (15)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_14" href="http://www.cnblogs.com/zhwl/archive/2015/03.html">2015年3月 (13)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_15" href="http://www.cnblogs.com/zhwl/archive/2015/02.html">2015年2月 (16)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_16" href="http://www.cnblogs.com/zhwl/archive/2015/01.html">2015年1月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_17" href="http://www.cnblogs.com/zhwl/archive/2014/12.html">2014年12月 (6)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_18" href="http://www.cnblogs.com/zhwl/archive/2014/11.html">2014年11月 (6)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_19" href="http://www.cnblogs.com/zhwl/archive/2014/09.html">2014年9月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_20" href="http://www.cnblogs.com/zhwl/archive/2014/07.html">2014年7月 (56)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_21" href="http://www.cnblogs.com/zhwl/archive/2014/06.html">2014年6月 (8)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_22" href="http://www.cnblogs.com/zhwl/archive/2014/05.html">2014年5月 (51)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_23" href="http://www.cnblogs.com/zhwl/archive/2014/04.html">2014年4月 (78)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_24" href="http://www.cnblogs.com/zhwl/archive/2014/03.html">2014年3月 (57)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_25" href="http://www.cnblogs.com/zhwl/archive/2014/02.html">2014年2月 (8)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_26" href="http://www.cnblogs.com/zhwl/archive/2014/01.html">2014年1月 (39)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_27" href="http://www.cnblogs.com/zhwl/archive/2013/12.html">2013年12月 (30)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_28" href="http://www.cnblogs.com/zhwl/archive/2013/11.html">2013年11月 (23)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_29" href="http://www.cnblogs.com/zhwl/archive/2013/10.html">2013年10月 (27)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_30" href="http://www.cnblogs.com/zhwl/archive/2013/09.html">2013年9月 (18)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_31" href="http://www.cnblogs.com/zhwl/archive/2013/08.html">2013年8月 (14)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_32" href="http://www.cnblogs.com/zhwl/archive/2013/07.html">2013年7月 (32)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_33" href="http://www.cnblogs.com/zhwl/archive/2013/06.html">2013年6月 (27)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_34" href="http://www.cnblogs.com/zhwl/archive/2013/05.html">2013年5月 (1)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_35" href="http://www.cnblogs.com/zhwl/archive/2013/04.html">2013年4月 (13)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_36" href="http://www.cnblogs.com/zhwl/archive/2013/03.html">2013年3月 (19)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_37" href="http://www.cnblogs.com/zhwl/archive/2013/02.html">2013年2月 (17)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_38" href="http://www.cnblogs.com/zhwl/archive/2013/01.html">2013年1月 (55)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_39" href="http://www.cnblogs.com/zhwl/archive/2012/12.html">2012年12月 (51)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_40" href="http://www.cnblogs.com/zhwl/archive/2012/11.html">2012年11月 (86)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_41" href="http://www.cnblogs.com/zhwl/archive/2012/10.html">2012年10月 (16)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_42" href="http://www.cnblogs.com/zhwl/archive/2012/09.html">2012年9月 (13)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_43" href="http://www.cnblogs.com/zhwl/archive/2012/08.html">2012年8月 (33)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_44" href="http://www.cnblogs.com/zhwl/archive/2012/07.html">2012年7月 (47)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_45" href="http://www.cnblogs.com/zhwl/archive/2012/06.html">2012年6月 (17)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_46" href="http://www.cnblogs.com/zhwl/archive/2012/05.html">2012年5月 (31)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_47" href="http://www.cnblogs.com/zhwl/archive/2012/04.html">2012年4月 (21)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_48" href="http://www.cnblogs.com/zhwl/archive/2012/03.html">2012年3月 (105)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_49" href="http://www.cnblogs.com/zhwl/archive/2012/02.html">2012年2月 (82)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_50" href="http://www.cnblogs.com/zhwl/archive/2012/01.html">2012年1月 (19)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_51" href="http://www.cnblogs.com/zhwl/archive/2011/12.html">2011年12月 (45)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_52" href="http://www.cnblogs.com/zhwl/archive/2011/11.html">2011年11月 (29)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_53" href="http://www.cnblogs.com/zhwl/archive/2011/10.html">2011年10月 (21)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_54" href="http://www.cnblogs.com/zhwl/archive/2011/09.html">2011年9月 (32)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_55" href="http://www.cnblogs.com/zhwl/archive/2011/08.html">2011年8月 (42)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_56" href="http://www.cnblogs.com/zhwl/archive/2011/07.html">2011年7月 (42)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_57" href="http://www.cnblogs.com/zhwl/archive/2011/06.html">2011年6月 (17)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_58" href="http://www.cnblogs.com/zhwl/archive/2011/05.html">2011年5月 (6)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_59" href="http://www.cnblogs.com/zhwl/archive/2011/04.html">2011年4月 (40)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_60" href="http://www.cnblogs.com/zhwl/archive/2011/03.html">2011年3月 (55)</a> </li>
+
+<li><a id="CatList_LinkList_1_Link_61" href="http://www.cnblogs.com/zhwl/archive/2011/02.html">2011年2月 (55)</a> </li>
+
+</ul>
+
+</div>
+
+<div class="catList">
+<h3 class="catListTitle">HTML</h3>
+
+<ul>
+
+<li><a id="CatList_LinkList_2_Link_0" href="http://blog.csdn.net/coolszy#" rel="nofollow">android学习网址</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_1" href="http://developer.51cto.com/developer/aspdotnet/" rel="nofollow">asp.net网站开发</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_2" href="http://www.yyjcw.com/html/News/1397.html" rel="nofollow">asp.net学习网站</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_3" href="http://www.enet.com.cn/eschool/video/autohtml/310/261/0.shtml" rel="nofollow">c++</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_4" href="http://club.topsage.com/thread-156290-1-1.html" rel="nofollow">c语言教程</a> </li>
+<li class="c_b_p_link_desc">c语言教程</li>
+<li><a id="CatList_LinkList_2_Link_5" href="http://blog.sina.com.cn/s/blog_616425f10100gss6.html" rel="nofollow">Flex中文视频教程</a> </li>
+<li class="c_b_p_link_desc">http://video.baidu.com/v?ct=301989888&amp;rn=20&amp;pn=0&amp;db=0&amp;s=8&amp;word=flex%B5%C4%CA%D3%C6%B5%BD%CC%B3%CC&amp;fr=ala0</li>
+<li><a id="CatList_LinkList_2_Link_6" href="http://www.abab123.com/Soft/ShowSoft.asp?SoftID=6242" rel="nofollow">Gis系统</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_7" href="http://mobile.51cto.com/news-147845.htm" rel="nofollow">iPhone多视图开发案例纪实</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_8" href="http://blog.csdn.net/nicktang/article/details/6826244" rel="nofollow">iphone开发</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_9" href="http://www.cocoachina.com/bbs/register.php?step=finish&amp;verify=e70a1b1b" rel="nofollow">iphone开发学习网址</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_10" href="http://v.youku.com/v_show/id_XMjk1OTk3MzIw.html?f=6608541" rel="nofollow">iphone视频教程</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_11" href="http://www.aspxcs.net/HTML/0021031734.html" rel="nofollow">JQuery操作cookie插件</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_12" href="http://www.jslab.org.cn/?tag=easyTitle" rel="nofollow">js用法</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_13" href="http://hi.baidu.com/ewmwxb/blog/item/3481a9c2472e301c0ef47729.html" rel="nofollow">sqlserver 视频学习</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_14" href="http://www.gissky.net/" rel="nofollow">关于地图 </a> </li>
+
+<li><a id="CatList_LinkList_2_Link_15" href="http://www.w3cmm.com/other/css-position.html" rel="nofollow">网页知识</a> </li>
+<li class="c_b_p_link_desc">网页知识</li>
+<li><a id="CatList_LinkList_2_Link_16" href="http://blog.csdn.net/BiologyPianoProgram/article/details/4103062" rel="nofollow">学习HTML：iframe用法总结收藏</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_17" href="http://www.w3school.com.cn/html5/index.asp" rel="nofollow">学习Html的好地方(w3school)</a> </li>
+
+<li><a id="CatList_LinkList_2_Link_18" href="http://en.hujiang.com/level/lingjichu/" rel="nofollow">英语学习</a> </li>
+
+</ul>
+
+</div>
+
+</div><div id="sidebar_scorerank" class="sidebar-block">
+<div class="catListBlogRank">
+<h3 class="catListTitle">积分与排名</h3>
+<ul>
+	<li class="liScore">
+		积分 -	1233605
+	</li>
+	<li class="liRank">
+		排名 -	44
+	</li>
+</ul>
+</div>
+
+
+</div><div id="sidebar_recentcomments" class="sidebar-block"><div id="recent_comments_wrap">
+<div class="catListComment">
+<h3 class="catListTitle">最新评论</h3>
+	<div id="RecentCommentsBlock"><ul>
+        <li class="recent_comment_title"><a href="http://www.cnblogs.com/zhwl/archive/2012/02/28/2371691.html#3715594">1. Re:HTTP Request header</a></li>
+        <li class="recent_comment_body">赞哦</li>
+        <li class="recent_comment_author">--王小军军军</li>
+        <li class="recent_comment_title"><a href="http://www.cnblogs.com/zhwl/archive/2012/08/28/2660532.html#3712486">2. Re:MySQL 显示表字段及注释等信息</a></li>
+        <li class="recent_comment_body">收集命令</li>
+        <li class="recent_comment_author">--niki92</li>
+        <li class="recent_comment_title"><a href="http://www.cnblogs.com/zhwl/p/3632133.html#3712015">3. Re:Java利用正则表达式统计某个字符串出现的次数</a></li>
+        <li class="recent_comment_body">你这个明显有bug，当匹配的字符是相同序列时就会出错，譬如在10011100110中匹配11等情况</li>
+        <li class="recent_comment_author">--buffermaker</li>
+        <li class="recent_comment_title"><a href="http://www.cnblogs.com/zhwl/p/3736125.html#3708991">4. Re:java 数据库连接池 Oracle版</a></li>
+        <li class="recent_comment_body">这跟连接池有什么关系?</li>
+        <li class="recent_comment_author">--耕耘者1294480</li>
+        <li class="recent_comment_title"><a href="http://www.cnblogs.com/zhwl/p/3210124.html#3704177">5. Re:HTML5手机开发——滚动和惯性缓动</a></li>
+        <li class="recent_comment_body">dsfds</li>
+        <li class="recent_comment_author">--ddd12312311111111</li>
+</ul>
+</div>
+</div>
+</div></div><div id="sidebar_topviewedposts" class="sidebar-block"><div id="topview_posts_wrap">
+<div class="catListView">
+<h3 class="catListTitle">阅读排行榜</h3>
+	<div id="TopViewPostsBlock"><ul><li><a href="http://www.cnblogs.com/zhwl/p/4368922.html">1. 用Visio画泳道图(52101)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3625360.html">2. jsp  Request获取url信息的各种方法比较(50977)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3727565.html">3. 不安装oracle客户端，用plsql连接oracle(48388)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3370426.html">4. 使用GCM服务（Google Cloud Messaging）实现Android消息推送(42986)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3373531.html">5. android学习——popupWindow 在指定位置上的显示(42574)</a></li></ul></div>
+</div>
+</div></div><div id="sidebar_topcommentedposts" class="sidebar-block"><div id="topfeedback_posts_wrap">
+<div class="catListFeedback">
+<h3 class="catListTitle">评论排行榜</h3>
+	<div id="TopFeedbackPostsBlock"><ul><li><a href="http://www.cnblogs.com/zhwl/archive/2012/08/09/2629647.html">1. 今天你抛弃了ASP.NET了吗？问题篇(13)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3333585.html">2. 日积月累：ScrollView嵌套ListView只显示一行(11)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3736522.html">3. Tomcat7中配置Oracle 11g数据库DBCP连接池(9)</a></li><li><a href="http://www.cnblogs.com/zhwl/archive/2011/02/26/1965613.html">4. 通过网银在线进行在线支付(9)</a></li><li><a href="http://www.cnblogs.com/zhwl/p/3611898.html">5. 微信支付----没我想的那么难！(8)</a></li></ul></div>
+</div>
+</div></div></div><script type="text/javascript">loadBlogSideColumn();</script>
+			</div>
+			
+		</div><!--end: sideBarMain -->
+	</div><!--end: sideBar 侧边栏容器 -->
+	<div class="clear"></div>
+	</div><!--end: main -->
+	<div class="clear"></div>
+	<div id="footer">
+		
+<!--done-->
+Copyright ©2017 郑文亮
+	</div><!--end: footer -->
+</div><!--end: home 自定义的最大容器 -->
+
+
+</body></html>
